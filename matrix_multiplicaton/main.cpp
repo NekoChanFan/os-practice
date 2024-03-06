@@ -115,22 +115,10 @@ i64 **matrix_multiply_multith(i64 **A, i64 **B_trans, size_t size,
 
 int main() {
   srand(time(NULL));
-  size_t size = 0, line_count = 0;
+  size_t size = 250;
   i64 **A = nullptr, **B = nullptr, **C = nullptr, **D = nullptr;
-  std::cout << "Введите количество элементов в строке(столбце) матрицы\n";
+
   std::cin >> size;
-
-  std::cout << "Введите количество строк, вычисляемых в одном потоке\n";
-  std::cin >> line_count;
-
-  char single_th;
-  std::cout << "Запустить ли однопоточный расчёт(может занять время)?[y/n]\n";
-  std::cin >> single_th;
-  if (!(line_count && size)) {
-    std::cout << "Введены некорректные данные. Перезапустите программу и "
-                 "попробуйте ещё раз";
-  }
-
   matrix_allocate_fill_rand(A, B, size);
 
   // std::cout << "Matrix A:\n";
@@ -141,31 +129,29 @@ int main() {
   transpose(B, size);
 
   auto start = std::chrono::steady_clock::now();
-  D = matrix_multiply_multith(A, B, size, line_count);
+  D = matrix_multiply_multith(A, B, size, size/12);
   auto end = std::chrono::steady_clock::now();
 
   std::cout << "\nМногопоточная реализация:\n";
-  // matrix_print(D, size);
+  //matrix_print(D, size);
   std::cout << "Затрачено времени: "
             << std::chrono::duration_cast<std::chrono::milliseconds>(end -
                                                                      start)
                    .count()
             << " миллисекунд";
 
-  if (single_th == 'y') {
-    start = std::chrono::steady_clock::now();
-    C = matrix_multiply_single_th(A, B, size);
-    end = std::chrono::steady_clock::now();
+  start = std::chrono::steady_clock::now();
+  C = matrix_multiply_single_th(A, B, size);
+  end = std::chrono::steady_clock::now();
 
-    std::cout << "\nОднопоточная реализация:\n";
-    // matrix_print(C, size);
-    std::cout << "Времени затрачено: "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(end -
-                                                                       start)
-                     .count()
-              << " миллисекунд";
-    matrix_delete(C, size);
-  }
+  std::cout << "\nОднопоточная реализация:\n";
+  //matrix_print(C, size);
+  std::cout << "Времени затрачено: "
+            << std::chrono::duration_cast<std::chrono::milliseconds>(end -
+                                                                     start)
+                   .count()
+            << " миллисекунд";
+  matrix_delete(C, size);
 
   matrix_delete(A, size);
   matrix_delete(B, size);
