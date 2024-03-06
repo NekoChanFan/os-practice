@@ -110,6 +110,8 @@ i64 **matrix_multiply_multith(i64 **A, i64 **B_trans, size_t size,
     th[i].join();
   }
 
+  delete [] th;
+
   return C;
 }
 
