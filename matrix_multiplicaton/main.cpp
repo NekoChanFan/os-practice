@@ -118,6 +118,7 @@ int main() {
   size_t size = 250;
   i64 **A = nullptr, **B = nullptr, **C = nullptr, **D = nullptr;
 
+  std::cout << "Введите размер матрицы\n";
   std::cin >> size;
   matrix_allocate_fill_rand(A, B, size);
 
@@ -129,11 +130,11 @@ int main() {
   transpose(B, size);
 
   auto start = std::chrono::steady_clock::now();
-  D = matrix_multiply_multith(A, B, size, size/12);
+  D = matrix_multiply_multith(A, B, size, size / 12);
   auto end = std::chrono::steady_clock::now();
 
   std::cout << "\nМногопоточная реализация:\n";
-  //matrix_print(D, size);
+  // matrix_print(D, size);
   std::cout << "Затрачено времени: "
             << std::chrono::duration_cast<std::chrono::milliseconds>(end -
                                                                      start)
@@ -145,7 +146,7 @@ int main() {
   end = std::chrono::steady_clock::now();
 
   std::cout << "\nОднопоточная реализация:\n";
-  //matrix_print(C, size);
+  // matrix_print(C, size);
   std::cout << "Времени затрачено: "
             << std::chrono::duration_cast<std::chrono::milliseconds>(end -
                                                                      start)
