@@ -4,7 +4,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <unistd.h>
+#include <unistd.h>      // Заменить на <windows.h> при запуске в Windows. Содержит sleep()
 
 #define ITERATIONS_COUNT 20000
 
