@@ -5,6 +5,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <thread>
 
 #define MAX_FILES 10
 #define MAX_FILENAME_LENGTH 32
@@ -51,25 +52,25 @@ Filesystem FS = Filesystem();
 bool Filesystem::f_create(const char *name) {
   printf("create: ");
   if (strlen(name) > 32 || strlen(name) < 1) {
-    printf("Inapropriate name");
+    printf("Inapropriate name\n");
     return false;
   }
   File *f = new File(name);
   this->createDeleteMt.lock();
   if (this->size + 1 > MAX_FILES) {
     this->createDeleteMt.unlock();
-    printf("Too many files, creation failed");
+    printf("Too many files, creation failed\n");
     delete f;
     return false;
   }
 
   if (this->files.emplace(std::string(name), f).second == false) {
     this->createDeleteMt.unlock();
-    printf("File with this name already exists");
+    printf("File with this name already exists\n");
     delete f;
     return false;
   };
-  printf("File %s created\n",name);
+  printf("File %s created\n", name);
   this->size++;
 
   this->createDeleteMt.unlock();
@@ -78,24 +79,32 @@ bool Filesystem::f_create(const char *name) {
 
 bool Filesystem::f_delete(const char *name) {
   printf("delete: ");
+  char *temp = new char[strlen(name) + 1];
+  strcpy(temp, name);
   this->createDeleteMt.lock();
-  auto it = this->files.find(name);
+  auto it = this->files.find(temp);
   if (it == this->files.end()) {
-    printf("No file with such name\n");
     this->createDeleteMt.unlock();
+    printf("No file with such name\n");
     return false;
   }
 
   delete it->second->data;
   printf("File %s deleted\n", name);
   this->files.erase(name);
+  this->size--;
+  this->createDeleteMt.unlock();
   return true;
 }
 
 void Filesystem::f_read(const char *name) {
   printf("read: ");
-  auto it = this->files.find(name);
+  char *temp = new char[strlen(name) + 1];
+  strcpy(temp, name);
+  this->createDeleteMt.lock();
+  auto it = this->files.find(temp);
   if (it == this->files.end()) {
+    this->createDeleteMt.unlock();
     printf("No file with such name\n");
     return;
   }
@@ -105,48 +114,61 @@ void Filesystem::f_read(const char *name) {
          "Contents: %s\n",
          name, it->second->data);
   it->second->mt.unlock();
+  this->createDeleteMt.unlock();
 }
 
 void Filesystem::f_write(const char *name, const char *data) {
   printf("write: ");
-  auto it = this->files.find(name);
+  char *temp = new char[strlen(name) + 1];
+  strcpy(temp, name);
+  this->createDeleteMt.lock();
+  auto it = this->files.find(temp);
   if (it == this->files.end()) {
+    this->createDeleteMt.unlock();
     printf("No file with such name\n");
     return;
   }
 
   it->second->mt.lock();
   delete it->second->data;
-  it->second->data = new char[strlen(data)];
+  it->second->data = new char[strlen(data) + 1];
   it->second->size = strlen(data);
   if (!it->second->data) {
+    it->second->mt.unlock();
+    this->createDeleteMt.unlock();
     perror("In write");
     return;
   }
-  strcpy(it->second->data, name);
+  strcpy(it->second->data, data);
   printf("File %s was successfully written.\n"
          "Contents:%s,\tSize: %d\n",
          name, data, it->second->size);
   it->second->mt.unlock();
+  this->createDeleteMt.unlock();
 }
 
 void Filesystem::f_find(const char *name) {
   printf("find: ");
-  auto it = this->files.find(name);
+  char *temp = new char[strlen(name) + 1];
+  strcpy(temp, name);
+  this->createDeleteMt.lock();
+  auto it = this->files.find(temp);
   if (it == this->files.end()) {
     printf("No file with such name\n");
+    this->createDeleteMt.unlock();
     return;
   }
   it->second->mt.lock();
   printf("File %s was successfully found. Size: %d\n", name, it->second->size);
   it->second->mt.unlock();
+  this->createDeleteMt.unlock();
 }
 
 void Filesystem::fs_print_info() {
   printf("print_info: ");
-  this->createDeleteMt.lock();
   printf("FILESYSTEM INFO\n"
          "name \t|\t size\n");
+  this->createDeleteMt.lock();
   for (auto it : this->files) {
     printf("%s \t|\t %d\n", it.second->name.c_str(), it.second->size);
   }
@@ -176,9 +198,36 @@ char *random_string(int maxLength, bool spaces) {
   return str;
 }
 
+char *existing_name() {
+  FS.createDeleteMt.lock();
+  if (FS.size == 0) {
+    FS.createDeleteMt.unlock();
+    return random_string(MAX_FILENAME_LENGTH, 0);
+  }
+  int pos = rand() % FS.files.size();
+  int i = 0;
+  for (auto it : FS.files) {
+    if (i == pos) {
+      const char *str = it.first.c_str();
+      char *res = new char[it.first.length() + 1];
+      strcpy(res, str);
+      FS.createDeleteMt.unlock();
+      return res;
+    }
+    ++i;
+  }
+  FS.createDeleteMt.unlock();
+  return nullptr;
+}
+
 void make_random_action() {
   int action = rand() % 6;
-  char *name = random_string(MAX_FILENAME_LENGTH, 0);
+  char *name;
+  if (rand() % 2) {
+    name = random_string(MAX_FILENAME_LENGTH, 0);
+  } else {
+    name = existing_name();
+  }
 
   switch (action) {
   case 0:
@@ -205,14 +254,18 @@ void make_random_action() {
 
 void user(int actionsAmount) {
   for (int i = 0; i < actionsAmount; ++i) {
-    printf("%d)",i);
+    printf("%d)", i);
     make_random_action();
   }
 }
 
 int main() {
-  // srand(time(NULL));
-  srand(4);
-  user(10);
+  srand(time(NULL));
+  // srand(4);
+  auto th1 = std::thread(user, 10);
+  int a = 10;
+  auto th2 = std::thread(user, 10);
+  th1.join();
+  th2.join();
   return 0;
 }
